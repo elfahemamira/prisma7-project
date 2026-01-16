@@ -1,35 +1,32 @@
 import { PrismaClient } from '@prisma/client';
 import { createAdapterFromUrl } from '../lib/db.js';
 
-const prisma = new PrismaClient({
-  adapter: createAdapterFromUrl(process.env.DATABASE_URL)
-});
-
 export default async function handler(req, res) {
-  const { method } = req;
+  console.log('API appelée :', req.method, req.url);
+  console.log('DATABASE_URL existe ?', !!process.env.DATABASE_URL);
+  console.log('DATABASE_URL value :', process.env.DATABASE_URL || 'MISSING !');
 
   try {
-    if (method === 'GET') {
-      const articles = await prisma.articles.findMany({
-        include: { scategories: { select: { nomscategorie: true } } }
-      });
+    console.log('Création adapter...');
+    const adapter = createAdapterFromUrl(process.env.DATABASE_URL);
+    console.log('Adapter créé');
+
+    console.log('Création PrismaClient...');
+    const prisma = new PrismaClient({ adapter });
+    console.log('PrismaClient prêt');
+
+    if (req.method === 'GET') {
+      const articles = await prisma.articles.findMany();
       return res.status(200).json(articles);
     }
 
-    if (method === 'POST') {
-      const { designation, marque, reference, qtestock, prix, imageart, scategorieID } = req.body;
-      const article = await prisma.articles.create({
-        data: { designation, marque, reference, qtestock, prix, imageart, scategorieID }
-      });
-      return res.status(201).json(article);
-    }
-
-    res.setHeader('Allow', ['GET', 'POST']);
-    return res.status(405).end(`Method ${method} Not Allowed`);
+    res.setHeader('Allow', ['GET']);
+    return res.status(405).end(`Method ${req.method} Not Allowed`);
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: 'Internal Server Error' });
+    console.error('Erreur dans handler :', error.message);
+    console.error('Stack :', error.stack);
+    return res.status(500).json({ error: error.message });
   } finally {
-    await prisma.$disconnect();
+    // await prisma.$disconnect(); // décommente si tu veux
   }
 }
